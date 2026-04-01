@@ -1,74 +1,106 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Camera Test</title>
-
-<style>
-body{
-font-family: Arial;
-text-align:center;
-background:#f5f5f5;
-}
-
-video{
-width:90%;
-max-width:500px;
-border-radius:10px;
-}
-
-button{
-padding:10px 20px;
-margin:10px;
-font-size:16px;
-}
-</style>
-
+  <meta charset="UTF-8">
+  <title>攝影機拍照</title>
+  <style>
+    body { text-align:center; font-family: Arial; }
+    video, canvas {
+      width: 90%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+  </style>
 </head>
-
 <body>
 
-<h2>攝影機測試</h2>
+<h2>📸 攝影機拍照（修正版）</h2>
 
-<video id="video" autoplay playsinline></video>
-
-<br>
+<video id="video" autoplay playsinline></video><br>
 
 <button onclick="startCamera()">開啟攝影機</button>
-<button onclick="stopCamera()">關閉攝影機</button>
+<button onclick="takePhoto()">拍照</button>
+
+<br>
+<canvas id="canvas"></canvas>
 
 <script>
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let currentStream = null;
 
-let stream;
-
-async function startCamera(){
-
-try{
-
-stream = await navigator.mediaDevices.getUserMedia({
-video:true
-});
-
-document.getElementById("video").srcObject = stream;
-
-}catch(err){
-
-alert("無法開啟攝影機");
-
+// ✅ 判斷裝置（手機 / 電腦）
+function isMobile() {
+  return /Android|iPhone|iPad/i.test(navigator.userAgent);
 }
 
+// ✅ 開啟攝影機（已修正）
+function startCamera() {
+
+  // 先關掉舊的串流
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+  }
+
+  let constraints;
+
+  if (isMobile()) {
+    // 📱 手機 → 用後鏡頭
+    constraints = {
+      video: { facingMode: "environment" },
+      audio: false
+    };
+  } else {
+    // 💻 電腦 → 用預設鏡頭（重點修正🔥）
+    constraints = {
+      video: true,
+      audio: false
+    };
+  }
+
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then(stream => {
+      currentStream = stream;
+      video.srcObject = stream;
+    })
+    .catch(err => {
+      console.error(err);
+      alert("❌ 開啟失敗\n\n錯誤：" + err.name + "\n原因：" + err.message);
+    });
 }
 
-function stopCamera(){
+// 📸 拍照
+function takePhoto() {
+  if (!video.srcObject) {
+    alert("請先開啟攝影機！");
+    return;
+  }
 
-if(stream){
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video, 0, 0);
 
-stream.getTracks().forEach(track=>track.stop());
+  let imageData = canvas.toDataURL("image/png");
 
+  console.log("拍照完成");
+
+  // 👉 如果要上傳再打開
+  /*
+  fetch("你的GAS網址", {
+    method: "POST",
+    body: JSON.stringify({ image: imageData }),
+    headers: { "Content-Type": "application/json" }
+  })
+  .then(res => res.text())
+  .then(data => alert("上傳成功：" + data));
+  */
 }
-
-}
-
 </script>
 
 </body>
