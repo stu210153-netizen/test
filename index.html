@@ -1,70 +1,17 @@
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var studentId = data.id;
 
-<script>
-let video = document.getElementById('video');
-let canvas = document.createElement('canvas');
-let ctx = canvas.getContext('2d');
-let stream = null;
-let scanning = false;
+  var sheet = SpreadsheetApp
+    .openById("你的試算表ID")
+    .getSheetByName("工作表1");
 
-// 開啟攝影機（🔥提高解析度）
-function startCamera() {
+  sheet.appendRow([
+    new Date(),
+    studentId
+  ]);
 
-  let constraints = {
-    video: {
-      facingMode: "environment",
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
-    }
-  };
-
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(s => {
-      stream = s;
-      video.srcObject = stream;
-      scanning = true;
-
-      setTimeout(scanLoop, 500); // 等畫面穩定（重要🔥）
-    })
-    .catch(err => {
-      alert("❌ 攝影機錯誤\n" + err);
-    });
+  return ContentService
+    .createTextOutput("簽到成功：" + studentId)
+    .setMimeType(ContentService.MimeType.TEXT);
 }
-
-// 停止
-function stopCamera() {
-  scanning = false;
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-  }
-}
-
-// 掃描（🔥加強版）
-function scanLoop() {
-  if (!scanning) return;
-
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    ctx.drawImage(video, 0, 0);
-
-    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    let code = jsQR(imageData.data, canvas.width, canvas.height, {
-      inversionAttempts: "dontInvert" // 🔥提速
-    });
-
-    if (code) {
-      document.getElementById("result").innerText =
-        "✅ 掃描成功：\n" + code.data;
-
-      stopCamera();
-      return;
-    }
-  }
-
-  requestAnimationFrame(scanLoop);
-}
-</script>
