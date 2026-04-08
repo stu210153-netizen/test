@@ -1,140 +1,120 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>拍照 + QR掃描</title>
-  <style>
-    body { text-align:center; font-family: Arial; }
-    video, canvas {
-      width: 90%;
-      max-width: 400px;
-      border: 1px solid #ccc;
-    }
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-    }
-    #result {
-      margin-top: 15px;
-      font-size: 18px;
-      color: green;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>攝影鏡頭表單</title>
 </head>
-<body>
 
-<h2>📸 拍照 + QR掃描</h2>
+<body style="text-align:center;font-family:sans-serif;">
 
-<video id="video" autoplay playsinline></video><br>
+<h2>📸 攝影鏡頭 + QR掃描</h2>
 
-<button onclick="startCamera()">開啟攝影機</button>
+<video id="video" autoplay playsinline muted
+style="width:90%;max-width:400px;background:black;"></video>
+<br>
+
+<button onclick="startCamera()">開啟鏡頭</button>
+<button onclick="switchCamera()">切換鏡頭</button>
 <button onclick="takePhoto()">拍照</button>
-<button onclick="stopCamera()">停止</button>
+
+<br><br>
+
+<button onclick="startScan()">開始掃描QR</button>
+<button onclick="stopScan()">停止掃描</button>
+
+<p id="result" style="color:blue;font-weight:bold;"></p>
 
 <br>
-<canvas id="canvas"></canvas>
+<canvas id="canvas" style="width:90%;max-width:400px;"></canvas>
 
-<div id="result">尚未掃描</div>
-
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<!-- 🔥 QR掃描套件 -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr"></script>
 
 <script>
 let video = document.getElementById('video');
 let canvas = document.getElementById('canvas');
-let ctx = canvas.getContext('2d');
+let context = canvas.getContext('2d');
+let result = document.getElementById('result');
+
+let currentFacing = "environment";
 let stream = null;
 let scanning = false;
 
-// 開攝影機（自動適配裝置🔥）
-function startCamera() {
+// 開啟攝影機
+async function startCamera() {
+  try {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
 
-  let isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: currentFacing },
+        audio: false
+      });
+    } catch (e) {
+      // fallback（桌機）
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    }
 
-  let constraints = isMobile
-    ? { video: { facingMode: "environment", width: { ideal: 1280 } } }
-    : { video: true };
+    video.srcObject = stream;
 
-  navigator.mediaDevices.getUserMedia(constraints)
-    .then(s => {
-      stream = s;
-      video.srcObject = stream;
-      scanning = true;
-      setTimeout(scanLoop, 500);
-    })
-    .catch(err => {
-      alert("❌ 攝影機錯誤\n" + err.name + "\n" + err.message);
-    });
-}
+    video.onloadedmetadata = () => {
+      video.play();
+    };
 
-// 停止
-function stopCamera() {
-  scanning = false;
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
+  } catch (err) {
+    alert("❌ 攝影機錯誤：\n" + err.name + "\n" + err.message);
   }
 }
 
-// 📸 拍照
+// 切換鏡頭
+function switchCamera() {
+  currentFacing = (currentFacing === "environment") ? "user" : "environment";
+  startCamera();
+}
+
+// 拍照
 function takePhoto() {
-  if (!video.srcObject) {
-    alert("請先開啟攝影機");
-    return;
-  }
-
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-
-  ctx.drawImage(video, 0, 0);
-
-  // 下載圖片（加分功能🔥）
-  let link = document.createElement('a');
-  link.download = 'photo.png';
-  link.href = canvas.toDataURL();
-  link.click();
+  context.drawImage(video, 0, 0);
 }
 
-// 🔍 掃描
+// 🔍 開始掃描
+function startScan() {
+  scanning = true;
+  scanLoop();
+}
+
+// ⛔ 停止掃描
+function stopScan() {
+  scanning = false;
+}
+
+// 🔄 掃描迴圈
 function scanLoop() {
   if (!scanning) return;
 
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
-
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0);
 
-    ctx.drawImage(video, 0, 0);
-
-    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    let code = jsQR(imageData.data, canvas.width, canvas.height, {
-      inversionAttempts: "dontInvert"
-    });
+    let imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    let code = jsQR(imageData.data, canvas.width, canvas.height);
 
     if (code) {
-      document.getElementById("result").innerText =
-        "✅ 掃描到：\n" + code.data;
-
-      // 🔊 提示音（加分🔥）
-      beep();
-
-      scanning = false; // 停止一次（避免狂掃）
+      result.innerText = "✅ QR內容：\n" + code.data;
+      scanning = false;
       return;
     }
   }
 
   requestAnimationFrame(scanLoop);
-}
-
-// 🔊 嗶聲
-function beep() {
-  let ctx = new AudioContext();
-  let osc = ctx.createOscillator();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(1000, ctx.currentTime);
-  osc.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.1);
 }
 </script>
 
