@@ -1,39 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>QR掃描系統</title>
-  <style>
-    body { text-align:center; font-family: Arial; }
-    video {
-      width: 90%;
-      max-width: 400px;
-      border: 1px solid #ccc;
-    }
-    button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-    }
-    #result {
-      margin-top: 20px;
-      font-size: 18px;
-      color: green;
-    }
-  </style>
-</head>
-<body>
-
-<h2>📷 QR Code 掃描</h2>
-
-<video id="video" autoplay playsinline></video><br>
-
-<button onclick="startCamera()">開啟攝影機</button>
-<button onclick="stopCamera()">停止</button>
-
-<div id="result">尚未掃描</div>
-
-<!-- QR 套件 -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 
 <script>
@@ -43,31 +7,31 @@ let ctx = canvas.getContext('2d');
 let stream = null;
 let scanning = false;
 
-// 判斷裝置
-function isMobile() {
-  return /Android|iPhone|iPad/i.test(navigator.userAgent);
-}
-
-// 開啟攝影機
+// 開啟攝影機（🔥提高解析度）
 function startCamera() {
 
-  let constraints = isMobile()
-    ? { video: { facingMode: "environment" } }
-    : { video: true };
+  let constraints = {
+    video: {
+      facingMode: "environment",
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  };
 
   navigator.mediaDevices.getUserMedia(constraints)
     .then(s => {
       stream = s;
       video.srcObject = stream;
       scanning = true;
-      scanLoop();
+
+      setTimeout(scanLoop, 500); // 等畫面穩定（重要🔥）
     })
     .catch(err => {
-      alert("❌ 無法開啟攝影機\n" + err);
+      alert("❌ 攝影機錯誤\n" + err);
     });
 }
 
-// 停止攝影機
+// 停止
 function stopCamera() {
   scanning = false;
   if (stream) {
@@ -75,49 +39,32 @@ function stopCamera() {
   }
 }
 
-// 掃描迴圈
+// 掃描（🔥加強版）
 function scanLoop() {
   if (!scanning) return;
 
   if (video.readyState === video.HAVE_ENOUGH_DATA) {
+
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+
     ctx.drawImage(video, 0, 0);
 
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    let code = jsQR(imageData.data, canvas.width, canvas.height);
+
+    let code = jsQR(imageData.data, canvas.width, canvas.height, {
+      inversionAttempts: "dontInvert" // 🔥提速
+    });
 
     if (code) {
-      document.getElementById("result").innerText = "✅ 掃描結果：\n" + code.data;
-      scanning = false; // 停止掃描
-      stopCamera();
+      document.getElementById("result").innerText =
+        "✅ 掃描成功：\n" + code.data;
 
-      // 👉 這裡可以做你要的事（超重要🔥）
-      onScanSuccess(code.data);
+      stopCamera();
       return;
     }
   }
 
   requestAnimationFrame(scanLoop);
 }
-
-// 掃描成功後
-function onScanSuccess(data) {
-  console.log("掃到：", data);
-
-  // 👉 範例：跳轉網址
-  if (data.startsWith("http")) {
-    if (confirm("要開啟連結嗎？")) {
-      window.location.href = data;
-    }
-  }
-
-  // 👉 你可以改成：
-  // - 傳到 GAS
-  // - 查學生名單
-  // - 簽到
-}
 </script>
-
-</body>
-</html>
